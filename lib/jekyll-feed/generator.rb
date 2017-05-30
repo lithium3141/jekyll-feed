@@ -1,4 +1,10 @@
 module JekyllFeed
+  class FeedConfig
+    attr_accessor :name # so far unused - just for identification
+    attr_accessor :path
+    attr_accessor :filter
+  end
+
   class Generator < Jekyll::Generator
     safe true
     priority :lowest
@@ -6,8 +12,10 @@ module JekyllFeed
     # Main plugin action, called by Jekyll-core
     def generate(site)
       @site = site
-      return if file_exists?(feed_path)
-      @site.pages << content_for_file(feed_path, feed_source_path)
+      feed_configs.each do |feed_config|
+        next if file_exists?(feed_config.path)
+        @site.pages << content_for_file(feed_config, feed_source_path)
+      end
     end
 
     private
@@ -19,12 +27,24 @@ module JekyllFeed
     MINIFY_REGEX = %r!(?<=>|})\s+!
 
     # Path to feed from config, or feed.xml for default
-    def feed_path
-      if @site.config["feed"] && @site.config["feed"]["path"]
-        @site.config["feed"]["path"]
-      else
-        "feed.xml"
+    def feed_configs
+      return ["feed.xml"] unless @site.config["feeds"]
+
+      feeds = []
+      @site.config["feeds"].each do |name, config|
+        next unless config["path"]
+
+        feed = FeedConfig.new
+        feed.path = config["path"]
+        
+        if config["filter"]
+          feed.filter = config["filter"]
+        end
+
+        feeds << feed
       end
+
+      feeds
     end
 
     # Path to feed.xml template file
@@ -42,12 +62,13 @@ module JekyllFeed
     end
 
     # Generates contents for a file
-    def content_for_file(file_path, file_source_path)
-      file = PageWithoutAFile.new(@site, File.dirname(__FILE__), "", file_path)
+    def content_for_file(feed_config, file_source_path)
+      file = PageWithoutAFile.new(@site, File.dirname(__FILE__), "", feed_config.path)
       file.content = File.read(file_source_path).gsub(MINIFY_REGEX, "")
       file.data["layout"] = nil
       file.data["sitemap"] = false
       file.data["xsl"] = file_exists?("feed.xslt.xml")
+      file.data["post_filter"] = feed_config.filter
       file.output
       file
     end

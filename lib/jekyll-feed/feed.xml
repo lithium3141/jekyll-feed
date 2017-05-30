@@ -32,6 +32,9 @@
   {% endif %}
 
   {% assign posts = site.posts | where_exp: "post", "post.draft != true" %}
+  {% if page.post_filter %}
+    {% assign posts = posts | where_exp: "post", page.post_filter %}
+  {% endif %}
   {% for post in posts limit: 10 %}
     <entry{% if post.lang %}{{" "}}xml:lang="{{ post.lang }}"{% endif %}>
       <title type="html">{{ post.title | smartify | strip_html | normalize_whitespace | xml_escape }}</title>
